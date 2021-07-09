@@ -10,7 +10,7 @@ fn main() {
 }
 ```
 
-
+Doesn't compile because the address of s is referenced by ref1. So there is immutable reference to s.
 
 Example 2:
 ```
@@ -20,7 +20,9 @@ fn drip_drop() -> &String {
 }
 ```
 
-
+Compiles. Because `String` refers to the data in the heap and it returns the address.
+Lifetime? The new concept.
+Not correct. Let's watch the Thursday lecture.
 
 Example 3:
 ```
@@ -32,3 +34,5 @@ fn main() {
     println!("{}", s2);
 }
 ```
+
+Compiles. Not correct. Let's watch Thursday lecture.
