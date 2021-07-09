@@ -1,4 +1,5 @@
 use grid::Grid; // For lcs()
+use std::cmp;
 use std::env;
 use std::fs::File; // For read_file_lines()
 use std::io::{self, BufRead}; // For read_file_lines()
@@ -19,15 +20,33 @@ fn read_file_lines(filename: &String) -> Result<Vec<String>, io::Error> {
     Ok(vec)
 }
 
-#[allow(unused)] // TODO: delete this line when you implement this function
 fn lcs(seq1: &Vec<String>, seq2: &Vec<String>) -> Grid {
     // Note: Feel free to use unwrap() in this code, as long as you're basically certain it'll
     // never happen. Conceptually, unwrap() is justified here, because there's not really any error
     // condition you're watching out for (i.e. as long as your code is written correctly, nothing
     // external can go wrong that we would want to handle in higher-level functions). The unwrap()
     // calls act like having asserts in C code, i.e. as guards against programming error.
-    unimplemented!();
-    // Be sure to delete the #[allow(unused)] line above
+    let mut grid: Grid = Grid::new(seq1.len() + 1, seq2.len() + 1);
+    // Initialize
+    for i in 0..seq1.len() + 1 {
+        grid.set(i, 0, 0);
+    }
+    for i in 0..seq2.len() + 1 {
+        grid.set(0, i, 0);
+    }
+
+    for i in 1..seq1.len() + 1 {
+        for j in 1..seq2.len() + 1 {
+            if seq1[i - 1] == seq2[j - 1] {
+                grid.set(i, j, grid.get(i - 1, j - 1).unwrap() + 1);
+            } else {
+                let val: usize = cmp::max(grid.get(i - 1, j).unwrap(), grid.get(i, j - 1).unwrap());
+                grid.set(i, j, val);
+            }
+        }
+    }
+
+    grid
 }
 
 #[allow(unused)] // TODO: delete this line when you implement this function
