@@ -29,19 +29,28 @@ fn lcs(seq1: &Vec<String>, seq2: &Vec<String>) -> Grid {
     let mut grid: Grid = Grid::new(seq1.len() + 1, seq2.len() + 1);
     // Initialize
     for i in 0..seq1.len() + 1 {
-        grid.set(i, 0, 0);
+        grid.set(i, 0, 0)
+            .expect(&format!("Failed to initialize seq1 at ({}, 0)", i));
     }
     for i in 0..seq2.len() + 1 {
-        grid.set(0, i, 0);
+        grid.set(0, i, 0)
+            .expect(&format!("Failed to initialize seq2 at (0, {})", i));
     }
 
     for i in 1..seq1.len() + 1 {
         for j in 1..seq2.len() + 1 {
             if seq1[i - 1] == seq2[j - 1] {
-                grid.set(i, j, grid.get(i - 1, j - 1).unwrap() + 1);
+                grid.set(i, j, grid.get(i - 1, j - 1).unwrap() + 1)
+                    .expect(&format!(
+                        "Failed to set Grid[{}][{}] = {}",
+                        i,
+                        j,
+                        grid.get(i - 1, j - 1).unwrap() + 1
+                    ));
             } else {
                 let val: usize = cmp::max(grid.get(i - 1, j).unwrap(), grid.get(i, j - 1).unwrap());
-                grid.set(i, j, val);
+                grid.set(i, j, val)
+                    .expect(&format!("Failed to set Grid[{}][{}] = {}", i, j, val));
             }
         }
     }
@@ -49,13 +58,21 @@ fn lcs(seq1: &Vec<String>, seq2: &Vec<String>) -> Grid {
     grid
 }
 
-#[allow(unused)] // TODO: delete this line when you implement this function
 fn print_diff(lcs_table: &Grid, lines1: &Vec<String>, lines2: &Vec<String>, i: usize, j: usize) {
-    unimplemented!();
-    // Be sure to delete the #[allow(unused)] line above
+    if i > 0 && j > 0 && lines1[i - 1] == lines2[j - 1] {
+        print_diff(lcs_table, lines1, lines2, i - 1, j - 1);
+        println!(" {}", lines1[i - 1]);
+    } else if j > 0 && (i == 0 || lcs_table.get(i, j - 1) >= lcs_table.get(i - 1, j)) {
+        print_diff(lcs_table, lines1, lines2, i, j - 1);
+        println!("> {}", lines2[j - 1]);
+    } else if i > 0 && (j == 0 || lcs_table.get(i, j - 1) < lcs_table.get(i - 1, j)) {
+        print_diff(lcs_table, lines1, lines2, i - 1, j);
+        println!("< {}", lines1[i - 1]);
+    } else {
+        print!("");
+    }
 }
 
-#[allow(unused)] // TODO: delete this line when you implement this function
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
@@ -65,8 +82,13 @@ fn main() {
     let filename1 = &args[1];
     let filename2 = &args[2];
 
-    unimplemented!();
-    // Be sure to delete the #[allow(unused)] line above
+    let lines1 =
+        read_file_lines(filename1).expect(&format!("Failed to read the file {}", filename1));
+    let lines2 =
+        read_file_lines(filename2).expect(&format!("Failed to read the file {}", filename2));
+
+    let grid: Grid = lcs(&lines1, &lines2);
+    print_diff(&grid, &lines1, &lines2, lines1.len(), lines2.len());
 }
 
 #[cfg(test)]
