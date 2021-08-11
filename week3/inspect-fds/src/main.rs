@@ -10,14 +10,16 @@ fn main() {
         println!("Usage: {} <name or pid of target>", args[0]);
         std::process::exit(1);
     }
-    
     let target = &args[1];
     let target_process = ps_utils::get_target(target).expect("Failed to get the target");
 
     match target_process {
         Some(process) => println!("Found pid {}", process.pid),
         None => {
-            let error_message = format!("Target \"{}\" did not match any running PIDs or executables", target);
+            let error_message = format!(
+                "Target \"{}\" did not match any running PIDs or executables",
+                target
+            );
             println!("{}", error_message);
             std::process::exit(1);
         }
