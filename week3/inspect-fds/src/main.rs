@@ -14,7 +14,7 @@ fn main() {
     let target_process = ps_utils::get_target(target).expect("Failed to get the target");
 
     match target_process {
-        Some(process) => println!("Found pid {}", process.pid),
+        Some(process) => process.print(),
         None => {
             let error_message = format!(
                 "Target \"{}\" did not match any running PIDs or executables",
