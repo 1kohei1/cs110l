@@ -73,6 +73,7 @@ impl Process {
                         file.colorized_name()
                     );
                 }
+                println!("");
             }
         }
     }
