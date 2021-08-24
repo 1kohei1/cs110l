@@ -20,6 +20,18 @@ impl<T> Node<T> {
     }
 }
 
+impl<T: Clone> Clone for Node<T> {
+    fn clone(&self) -> Self {
+        Node::new(self.value.clone(), self.next.clone())
+    }
+}
+
+impl<T: PartialEq> PartialEq for Node<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value && self.next == other.next
+    }
+}
+
 impl<T> LinkedList<T> {
     pub fn new() -> LinkedList<T> {
         LinkedList {
@@ -69,5 +81,40 @@ impl<T> Drop for LinkedList<T> {
         while let Some(mut node) = current {
             current = node.next.take();
         }
+    }
+}
+
+impl<T: Clone> Clone for LinkedList<T> {
+    fn clone(&self) -> Self {
+        let mut cloned: LinkedList<T> = LinkedList::new();
+        let mut head: &Option<Box<Node<T>>> = &self.head;
+        let mut value_list: Vec<T> = Vec::new();
+        loop {
+            match head {
+                Some(node) => {
+                    let cloned_node = node.clone();
+                    value_list.push(cloned_node.value);
+                    head = &node.next;
+                }
+                None => break,
+            }
+        }
+
+        for val in value_list.iter().rev() {
+            let clone = val.clone();
+            cloned.push_front(clone);
+        }
+
+        cloned
+    }
+}
+
+impl<T: PartialEq> PartialEq for LinkedList<T> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.get_size() != other.get_size() {
+            return false;
+        }
+
+        self.head == other.head
     }
 }
