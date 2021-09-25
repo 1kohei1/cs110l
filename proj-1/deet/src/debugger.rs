@@ -1,4 +1,5 @@
 use crate::debugger_command::DebuggerCommand;
+use crate::dwarf_data::{DwarfData, Error as DwarfError};
 use crate::inferior::Inferior;
 use crate::inferior::Status;
 use rustyline::error::ReadlineError;
@@ -9,12 +10,23 @@ pub struct Debugger {
     history_path: String,
     readline: Editor<()>,
     inferior: Option<Inferior>,
+    dwarf_data: DwarfData,
 }
 
 impl Debugger {
     /// Initializes the debugger.
     pub fn new(target: &str) -> Debugger {
-        // TODO (milestone 3): initialize the DwarfData
+        let dwarf_data = match DwarfData::from_file(target) {
+            Ok(val) => val,
+            Err(DwarfError::ErrorOpeningFile) => {
+                println!("Could not open file {}", target);
+                std::process::exit(1);
+            }
+            Err(DwarfError::DwarfFormatError(err)) => {
+                println!("Could not debugging symbols {}: {:?}", target, err);
+                std::process::exit(1);
+            }
+        };
 
         let history_path = format!("{}/.deet_history", std::env::var("HOME").unwrap());
         let mut readline = Editor::<()>::new();
@@ -26,6 +38,7 @@ impl Debugger {
             history_path,
             readline,
             inferior: None,
+            dwarf_data,
         }
     }
 
@@ -74,7 +87,7 @@ impl Debugger {
                 DebuggerCommand::Backtrace => {
                     match &self.inferior {
                         Some(inf) => {
-                            inf.print_backtrace().ok();
+                            inf.print_backtrace(&self.dwarf_data).ok();
                         }
                         None => println!("No child process under debugging"),
                     };
