@@ -61,6 +61,15 @@ impl Inferior {
         nix::unistd::Pid::from_raw(self.child.id() as i32)
     }
 
+    /// Kills the child process if running.
+    pub fn kill(&mut self) {
+        if let Ok(()) = self.child.kill() {
+            println!("Killing running inferior (pid {})", self.pid());
+            self.wait(None)
+                .expect("Child process is supposed to be exited successfully");
+        }
+    }
+
     /// Calls waitpid on this inferior and returns a Status to indicate the state of the process
     /// after the waitpid call.
     pub fn wait(&self, options: Option<WaitPidFlag>) -> Result<Status, nix::Error> {

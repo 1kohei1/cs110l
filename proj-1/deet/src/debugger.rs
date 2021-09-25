@@ -29,32 +29,52 @@ impl Debugger {
         }
     }
 
+    fn print_inferior_run_result(&self, result: Result<Status, nix::Error>) {
+        match result {
+            Ok(status) => {
+                match status {
+                    Status::Stopped(signal, _) => {
+                        println!("Child stopped (signal {})", signal)
+                    }
+                    Status::Exited(code) => {
+                        println!("Child exited (status {})", code)
+                    }
+                    Status::Signaled(signal) => println!("Signaled {}", signal),
+                };
+            }
+            Err(err) => println!("Error continuing the program. {}", err),
+        }
+    }
+
     pub fn run(&mut self) {
         loop {
             match self.get_next_command() {
                 DebuggerCommand::Run(args) => {
+                    // If run command is executed while a child process is running (this
+                    // happens when child process is paused by Ctrl-C and r/run command is entered
+                    // to DEET.
+                    if self.inferior.is_some() {
+                        self.inferior.as_mut().unwrap().kill();
+                    }
                     if let Some(inferior) = Inferior::new(&self.target, &args) {
                         // Create the inferior
                         self.inferior = Some(inferior);
-                        match self.inferior.as_mut().unwrap().cont() {
-                            Ok(status) => {
-                                match status {
-                                    Status::Stopped(signal, _) => {
-                                        println!("Stopped with {}", signal)
-                                    }
-                                    Status::Exited(code) => {
-                                        println!("Child exited (status {})", code)
-                                    }
-                                    Status::Signaled(signal) => println!("Signaled {}", signal),
-                                };
-                            }
-                            Err(err) => println!("Error continuing the program. {}", err),
-                        };
+                        let result = self.inferior.as_mut().unwrap().cont();
+                        self.print_inferior_run_result(result);
                     } else {
                         println!("Error starting subprocess");
                     }
                 }
+                DebuggerCommand::Cont => {
+                    match &self.inferior {
+                        Some(inf) => self.print_inferior_run_result(inf.cont()),
+                        None => println!("No child process under debugging"),
+                    };
+                }
                 DebuggerCommand::Quit => {
+                    if self.inferior.is_some() {
+                        self.inferior.as_mut().unwrap().kill();
+                    }
                     return;
                 }
             }
