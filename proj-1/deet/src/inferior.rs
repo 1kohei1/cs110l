@@ -45,14 +45,14 @@ impl Inferior {
             child: cmd.spawn().ok()?,
         };
         match inf.wait(None).ok()? {
-            Status::Exited(_status) => None,
-            Status::Signaled(signal) | Status::Stopped(signal, _) => {
+            Status::Stopped(signal, _) => {
                 if signal == signal::SIGTRAP {
                     Some(inf)
                 } else {
                     None
                 }
             }
+            _other => None,
         }
     }
 
