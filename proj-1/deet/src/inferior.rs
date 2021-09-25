@@ -74,4 +74,9 @@ impl Inferior {
             other => panic!("waitpid returned unexpected status: {:?}", other),
         })
     }
+
+    pub fn cont(&self) -> Result<Status, nix::Error> {
+        ptrace::cont(self.pid(), None)?;
+        self.wait(None)
+    }
 }
