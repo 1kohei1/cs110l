@@ -71,7 +71,14 @@ impl Debugger {
                         None => println!("No child process under debugging"),
                     };
                 }
-                DebuggerCommand::Backtrace => {}
+                DebuggerCommand::Backtrace => {
+                    match &self.inferior {
+                        Some(inf) => {
+                            inf.print_backtrace().ok();
+                        }
+                        None => println!("No child process under debugging"),
+                    };
+                }
                 DebuggerCommand::Quit => {
                     if self.inferior.is_some() {
                         self.inferior.as_mut().unwrap().kill();

@@ -88,4 +88,10 @@ impl Inferior {
         ptrace::cont(self.pid(), None)?;
         self.wait(None)
     }
+
+    pub fn print_backtrace(&self) -> Result<(), nix::Error> {
+        let rip_val = ptrace::getregs(self.pid())?.rip;
+        println!("%rip register: {:#x}", rip_val);
+        Ok(())
+    }
 }
