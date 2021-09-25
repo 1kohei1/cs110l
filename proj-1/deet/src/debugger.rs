@@ -46,8 +46,11 @@ impl Debugger {
         match result {
             Ok(status) => {
                 match status {
-                    Status::Stopped(signal, _) => {
-                        println!("Child stopped (signal {})", signal)
+                    Status::Stopped(signal, rip) => {
+                        println!("Child stopped (signal {})", signal);
+                        if let Some(line) = &self.dwarf_data.get_line_from_addr(rip) {
+                            println!("Stopped at {}:{}", line.file, line.number);
+                        }
                     }
                     Status::Exited(code) => {
                         println!("Child exited (status {})", code)
