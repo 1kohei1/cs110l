@@ -94,10 +94,12 @@ impl Debugger {
                     }
                 }
                 DebuggerCommand::Cont => {
-                    match &self.inferior {
-                        Some(inf) => self.print_inferior_run_result(inf.cont()),
-                        None => println!("No child process under debugging"),
-                    };
+                    if self.inferior.is_some() {
+                        let result = self.inferior.as_mut().unwrap().cont();
+                        self.print_inferior_run_result(result);
+                    } else {
+                        println!("No child process under debugging");
+                    }
                 }
                 DebuggerCommand::Backtrace => {
                     match &self.inferior {

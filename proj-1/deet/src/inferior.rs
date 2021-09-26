@@ -3,6 +3,7 @@ use nix::sys::ptrace;
 use nix::sys::signal;
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
 use nix::unistd::Pid;
+use std::collections::HashMap;
 use std::mem::size_of;
 use std::os::unix::process::CommandExt;
 use std::process::Child;
@@ -36,6 +37,7 @@ fn align_addr_to_word(addr: usize) -> usize {
 
 pub struct Inferior {
     child: Child,
+    breakpoints_original_instr: HashMap<usize, u8>,
 }
 
 impl Inferior {
@@ -49,6 +51,7 @@ impl Inferior {
         }
         let mut inf = Inferior {
             child: cmd.spawn().ok()?,
+            breakpoints_original_instr: HashMap::new(),
         };
         match inf.wait(None).ok()? {
             Status::Stopped(signal, _) => {
@@ -94,7 +97,46 @@ impl Inferior {
         })
     }
 
-    pub fn cont(&self) -> Result<Status, nix::Error> {
+    pub fn cont(&mut self) -> Result<Status, nix::Error> {
+        // Check if the child process stopped at the breakpoint
+        let mut registers = ptrace::getregs(self.pid())?;
+        let rip_addr = registers.rip as usize;
+        let orig_instr = self.breakpoints_original_instr.get(&(rip_addr - 1));
+        if orig_instr.is_some() {
+            let instr = *orig_instr.unwrap();
+            // Put back the original instr.
+            match self.write_byte(rip_addr - 1, instr) {
+                Err(err) => println!("Failed to rewind the register. {}", err),
+                _ => {}
+            };
+            // Rewind the rip pointer back 1.
+            registers.rip = (rip_addr as u64) - 1;
+            ptrace::setregs(self.pid(), registers).expect("Failed to rewind the rip register");
+
+            // Only execute the next instruction.
+            ptrace::step(self.pid(), None)?;
+            match self.wait(None) {
+                Ok(status) => {
+                    match status {
+                        // Process exited.
+                        Status::Exited(_) => return Ok(status),
+                        Status::Signaled(signal) => println!("Signaled {}", signal),
+                        Status::Stopped(signal, _rip) => {
+                            if signal == signal::Signal::SIGTRAP {
+                                // Restore the breakpoint at (rip_addr - 1).
+                                self.set_breakpoint(rip_addr - 1);
+                            } else {
+                                panic!("failed to go to the next instruction. signal: {}", signal);
+                            }
+                        }
+                    };
+                }
+                Err(err) => panic!("wait returned unexpected status: {:?}", err),
+            };
+
+            // Resume the rest of execution.
+        }
+
         ptrace::cont(self.pid(), None)?;
         self.wait(None)
     }
@@ -132,8 +174,16 @@ impl Inferior {
         match self.child.try_wait() {
             // Only when the child process is running, set the breakpoint.
             Ok(None) => {
-                let err_message = format!("Failed to set the breakpoint at {}", addr);
-                self.write_byte(addr, 0xcc).expect(&err_message);
+                match self.write_byte(addr, 0xcc) {
+                    Ok(orig_instr) => {
+                        // If the address is not stored in the breakpoints_original_instr hashmap,
+                        // store the original instruction.
+                        if !self.breakpoints_original_instr.contains_key(&addr) {
+                            self.breakpoints_original_instr.insert(addr, orig_instr);
+                        }
+                    }
+                    Err(err) => println!("Failed to set the breakpoint at {}. Err: {}", addr, err),
+                };
             }
             // If the child process is not running, do nothing.
             _ => {}
