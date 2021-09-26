@@ -54,9 +54,8 @@ impl Inferior {
             Status::Stopped(signal, _) => {
                 if signal == signal::SIGTRAP {
                     // Install breakpoints here.
-                    for (idx, addr) in breakpoints.iter().enumerate() {
-                        let err_message = format!("Failed to set the breakpoint {}", idx);
-                        inf.write_byte(*addr, 0xcc).expect(&err_message);
+                    for addr in breakpoints {
+                        inf.set_breakpoint(*addr);
                     }
                     Some(inf)
                 } else {
@@ -126,6 +125,19 @@ impl Inferior {
             base_ptr = ptrace::read(self.pid(), base_ptr as ptrace::AddressType)? as usize;
         }
         Ok(())
+    }
+
+    /// Set the breakpoint if the child process is running.
+    pub fn set_breakpoint(&mut self, addr: usize) {
+        match self.child.try_wait() {
+            // Only when the child process is running, set the breakpoint.
+            Ok(None) => {
+                let err_message = format!("Failed to set the breakpoint at {}", addr);
+                self.write_byte(addr, 0xcc).expect(&err_message);
+            }
+            // If the child process is not running, do nothing.
+            _ => {}
+        };
     }
 
     fn write_byte(&mut self, addr: usize, val: u8) -> Result<u8, nix::Error> {

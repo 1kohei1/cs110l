@@ -37,6 +37,7 @@ impl Debugger {
                 std::process::exit(1);
             }
         };
+        debug_data.print();
 
         let history_path = format!("{}/.deet_history", std::env::var("HOME").unwrap());
         let mut readline = Editor::<()>::new();
@@ -113,12 +114,15 @@ impl Debugger {
                         breakpoint
                     );
 
-                    let addr = parse_address(&breakpoint);
-                    if addr.is_none() {
-                        println!("Failed to parse a breakpoint");
-                        return;
-                    }
-                    self.breakpoints.push(addr.unwrap());
+                    match parse_address(&breakpoint) {
+                        Some(addr) => {
+                            if self.inferior.is_some() {
+                                self.inferior.as_mut().unwrap().set_breakpoint(addr);
+                            }
+                            self.breakpoints.push(addr);
+                        }
+                        None => println!("Failed to parse a breakpoint"),
+                    };
                 }
                 DebuggerCommand::Quit => {
                     if self.inferior.is_some() {
