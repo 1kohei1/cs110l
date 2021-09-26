@@ -3,6 +3,7 @@ pub enum DebuggerCommand {
     Run(Vec<String>),
     Cont,
     Backtrace,
+    BreakPoint(String),
 }
 
 impl DebuggerCommand {
@@ -17,6 +18,13 @@ impl DebuggerCommand {
             }
             "c" | "cont" | "continue" => Some(DebuggerCommand::Cont),
             "bt" | "back" | "backtrace" => Some(DebuggerCommand::Backtrace),
+            "b" | "break" => {
+                let mut addr = tokens[1];
+                if &addr[0..1] == "*" {
+                    addr = &addr[1..];
+                }
+                Some(DebuggerCommand::BreakPoint(addr.to_string()))
+            }
             // Default case:
             _ => None,
         }

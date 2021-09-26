@@ -11,6 +11,16 @@ pub struct Debugger {
     readline: Editor<()>,
     inferior: Option<Inferior>,
     dwarf_data: DwarfData,
+    breakpoints: Vec<usize>,
+}
+
+fn parse_address(addr: &str) -> Option<usize> {
+    let addr_without_0x = if addr.to_lowercase().starts_with("0x") {
+        &addr[2..]
+    } else {
+        &addr
+    };
+    usize::from_str_radix(addr_without_0x, 16).ok()
 }
 
 impl Debugger {
@@ -39,6 +49,7 @@ impl Debugger {
             readline,
             inferior: None,
             dwarf_data,
+            breakpoints: Vec::new(),
         }
     }
 
@@ -94,6 +105,20 @@ impl Debugger {
                         }
                         None => println!("No child process under debugging"),
                     };
+                }
+                DebuggerCommand::BreakPoint(breakpoint) => {
+                    println!(
+                        "Set breakpoint {} at {}",
+                        self.breakpoints.len(),
+                        breakpoint
+                    );
+
+                    let addr = parse_address(&breakpoint);
+                    if addr.is_none() {
+                        println!("Failed to parse a breakpoint");
+                        return;
+                    }
+                    self.breakpoints.push(addr.unwrap());
                 }
                 DebuggerCommand::Quit => {
                     if self.inferior.is_some() {
