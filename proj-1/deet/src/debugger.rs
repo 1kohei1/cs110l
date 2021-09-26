@@ -10,7 +10,7 @@ pub struct Debugger {
     history_path: String,
     readline: Editor<()>,
     inferior: Option<Inferior>,
-    dwarf_data: DwarfData,
+    debug_data: DwarfData,
     breakpoints: Vec<usize>,
 }
 
@@ -26,7 +26,7 @@ fn parse_address(addr: &str) -> Option<usize> {
 impl Debugger {
     /// Initializes the debugger.
     pub fn new(target: &str) -> Debugger {
-        let dwarf_data = match DwarfData::from_file(target) {
+        let debug_data = match DwarfData::from_file(target) {
             Ok(val) => val,
             Err(DwarfError::ErrorOpeningFile) => {
                 println!("Could not open file {}", target);
@@ -48,7 +48,7 @@ impl Debugger {
             history_path,
             readline,
             inferior: None,
-            dwarf_data,
+            debug_data,
             breakpoints: Vec::new(),
         }
     }
@@ -59,7 +59,7 @@ impl Debugger {
                 match status {
                     Status::Stopped(signal, rip) => {
                         println!("Child stopped (signal {})", signal);
-                        if let Some(line) = &self.dwarf_data.get_line_from_addr(rip) {
+                        if let Some(line) = &self.debug_data.get_line_from_addr(rip) {
                             println!("Stopped at {}:{}", line.file, line.number);
                         }
                     }
@@ -83,7 +83,7 @@ impl Debugger {
                     if self.inferior.is_some() {
                         self.inferior.as_mut().unwrap().kill();
                     }
-                    if let Some(inferior) = Inferior::new(&self.target, &args) {
+                    if let Some(inferior) = Inferior::new(&self.target, &args, &self.breakpoints) {
                         // Create the inferior
                         self.inferior = Some(inferior);
                         let result = self.inferior.as_mut().unwrap().cont();
@@ -101,7 +101,7 @@ impl Debugger {
                 DebuggerCommand::Backtrace => {
                     match &self.inferior {
                         Some(inf) => {
-                            inf.print_backtrace(&self.dwarf_data).ok();
+                            inf.print_backtrace(&self.debug_data).ok();
                         }
                         None => println!("No child process under debugging"),
                     };

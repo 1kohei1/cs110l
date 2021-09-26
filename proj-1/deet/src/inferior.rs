@@ -3,6 +3,7 @@ use nix::sys::ptrace;
 use nix::sys::signal;
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
 use nix::unistd::Pid;
+use std::mem::size_of;
 use std::os::unix::process::CommandExt;
 use std::process::Child;
 use std::process::Command;
@@ -29,6 +30,10 @@ fn child_traceme() -> Result<(), std::io::Error> {
     )))
 }
 
+fn align_addr_to_word(addr: usize) -> usize {
+    addr & (-(size_of::<usize>() as isize) as usize)
+}
+
 pub struct Inferior {
     child: Child,
 }
@@ -36,18 +41,23 @@ pub struct Inferior {
 impl Inferior {
     /// Attempts to start a new inferior process. Returns Some(Inferior) if successful, or None if
     /// an error is encountered.
-    pub fn new(target: &str, args: &Vec<String>) -> Option<Inferior> {
+    pub fn new(target: &str, args: &Vec<String>, breakpoints: &Vec<usize>) -> Option<Inferior> {
         let mut cmd = Command::new(target);
         cmd.args(args);
         unsafe {
             cmd.pre_exec(child_traceme);
         }
-        let inf = Inferior {
+        let mut inf = Inferior {
             child: cmd.spawn().ok()?,
         };
         match inf.wait(None).ok()? {
             Status::Stopped(signal, _) => {
                 if signal == signal::SIGTRAP {
+                    // Install breakpoints here.
+                    for (idx, addr) in breakpoints.iter().enumerate() {
+                        let err_message = format!("Failed to set the breakpoint {}", idx);
+                        inf.write_byte(*addr, 0xcc).expect(&err_message);
+                    }
                     Some(inf)
                 } else {
                     None
@@ -90,19 +100,19 @@ impl Inferior {
         self.wait(None)
     }
 
-    pub fn print_backtrace(&self, dwarf_data: &DwarfData) -> Result<(), nix::Error> {
+    pub fn print_backtrace(&self, debug_data: &DwarfData) -> Result<(), nix::Error> {
         let mut instruction_ptr = ptrace::getregs(self.pid())?.rip as usize;
         let mut base_ptr = ptrace::getregs(self.pid())?.rbp as usize;
 
         loop {
-            let line = dwarf_data
+            let line = debug_data
                 .get_line_from_addr(instruction_ptr)
                 .unwrap_or(Line {
                     file: "undefined".to_string(),
                     number: 0,
                     address: instruction_ptr,
                 });
-            let function = dwarf_data
+            let function = debug_data
                 .get_function_from_addr(instruction_ptr)
                 .unwrap_or("undefined".to_string());
 
@@ -116,5 +126,20 @@ impl Inferior {
             base_ptr = ptrace::read(self.pid(), base_ptr as ptrace::AddressType)? as usize;
         }
         Ok(())
+    }
+
+    fn write_byte(&mut self, addr: usize, val: u8) -> Result<u8, nix::Error> {
+        let aligned_addr = align_addr_to_word(addr);
+        let byte_offset = addr - aligned_addr;
+        let word = ptrace::read(self.pid(), aligned_addr as ptrace::AddressType)? as u64;
+        let orig_byte = (word >> 8 * byte_offset) & 0xff;
+        let masked_word = word & !(0xff << 8 * byte_offset);
+        let updated_word = masked_word | ((val as u64) << 8 * byte_offset);
+        ptrace::write(
+            self.pid(),
+            aligned_addr as ptrace::AddressType,
+            updated_word as *mut std::ffi::c_void,
+        )?;
+        Ok(orig_byte as u8)
     }
 }
