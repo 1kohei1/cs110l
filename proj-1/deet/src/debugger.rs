@@ -14,13 +14,18 @@ pub struct Debugger {
     breakpoints: Vec<usize>,
 }
 
-fn parse_address(addr: &str) -> Option<usize> {
-    let addr_without_0x = if addr.to_lowercase().starts_with("0x") {
-        &addr[2..]
-    } else {
-        &addr
+fn parse_address(addr: &str, debug_data: &DwarfData) -> Option<usize> {
+    // Check if the address
+    if addr.to_lowercase().starts_with("0x") {
+        let addr_without_0x = &addr[2..];
+        return usize::from_str_radix(addr_without_0x, 16).ok();
+    }
+    // Check if it's a line number.
+    match addr.parse::<usize>() {
+        Ok(line_no) => return debug_data.get_addr_for_line(None, line_no),
+        Err(_) => {}
     };
-    usize::from_str_radix(addr_without_0x, 16).ok()
+    debug_data.get_addr_for_function(None, addr)
 }
 
 impl Debugger {
@@ -110,14 +115,9 @@ impl Debugger {
                     };
                 }
                 DebuggerCommand::BreakPoint(breakpoint) => {
-                    println!(
-                        "Set breakpoint {} at {}",
-                        self.breakpoints.len(),
-                        breakpoint
-                    );
-
-                    match parse_address(&breakpoint) {
+                    match parse_address(&breakpoint, &self.debug_data) {
                         Some(addr) => {
+                            println!("Set breakpoint {} at {:#x}", self.breakpoints.len(), addr);
                             if self.inferior.is_some() {
                                 self.inferior.as_mut().unwrap().set_breakpoint(addr);
                             }
